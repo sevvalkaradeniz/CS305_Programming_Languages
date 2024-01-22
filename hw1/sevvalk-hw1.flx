@@ -1,0 +1,149 @@
+Mail "Mail"
+endMail "end"[ \t\n]+"Mail"
+send "send"
+from "from"
+schedule "schedule"
+endSchedule "end"[ \t\n]+"schedule"
+to "to"
+set "set"
+comma ","
+lpr "("
+lbr "["
+at "@"
+colon ":"
+rpr ")"
+rbr "]"
+identifiers [A-Za-z_]{1}[A-Za-z0-9_]*
+strings ["][^"]*["] 
+emailAddress [A-Za-z0-9_-]+(([.][A-Za-z0-9_-]+)|[A-Za-z0-9_-]*)+"@"(([A-Za-z0-9]+(([A-Za-z0-9-]*[A-Za-z0-9]+"."){1,2})|([A-Za-z0-9]+"."){1,2}))((([A-Za-z0-9]+[A-Za-z0-9-]*[A-Za-z0-9]+)|([A-Za-z0-9]+)))
+dateValue ((((([0-9]){2})"/"){2})(([0-9]){4}))|((((([0-9]){2})"-"){2})(([0-9]){4}))|((((([0-9]){2})"."){2})(([0-9]){4}))
+timeValue (([0-9]){2})":"(([0-9]){2})
+
+illegalCharacter [^ \t\n]
+
+%x singleCommentState
+%x multipleLineCommentState
+
+%{
+int numberOfLines=1 ;
+int numberOfNestedComments=0;
+%}
+
+
+%%
+{Mail} printf("%d_tMAIL\n", numberOfLines);
+{endMail} {
+    printf("%d_tENDMAIL\n",numberOfLines);
+    int i =0;
+    while(yytext[i]!='\0'){      
+    if(yytext[i]=='\n'){
+        numberOfLines++;
+    }
+    i++;
+    }
+}
+{send} printf("%d_tSEND\n",numberOfLines);
+{from} printf("%d_tFROM\n",numberOfLines);
+{schedule} printf("%d_tSCHEDULE\n",numberOfLines);
+{endSchedule} {
+    printf("%d_tENDSCHEDULE\n",numberOfLines);
+    int i =0;
+    while(yytext[i]!='\0'){      
+    if(yytext[i]=='\n'){
+        numberOfLines++;
+    }
+    i++;
+    }
+}
+{to} printf("%d_tTO\n",numberOfLines);
+{set} printf("%d_tSET\n",numberOfLines);
+{comma} printf("%d_tCOMMA\n",numberOfLines);
+{lpr} printf("%d_tLPR\n",numberOfLines);
+{lbr} printf("%d_tLBR\n",numberOfLines);
+{at} printf("%d_tAT\n",numberOfLines);
+{colon} printf("%d_tCOLON\n",numberOfLines);
+{rpr} printf("%d_tRPR\n",numberOfLines);
+{rbr} printf("%d_tRBR\n",numberOfLines);
+{identifiers} printf("%d_tIDENT_(%s)\n",numberOfLines,yytext);
+
+{strings} {
+    int length = strlen(yytext);
+    memmove(yytext, yytext + 1, length - 2); 
+    yytext[length - 2] = '\0';
+    printf("%d_tSTRING_(%s)\n",numberOfLines, yytext);
+    int i =0;
+    while(yytext[i]!='\0'){      
+    if(yytext[i]=='\n'){
+        numberOfLines++;
+    }
+    i++;
+}
+}
+
+{emailAddress} printf("%d_tADDRESS_(%s)\n",numberOfLines, yytext);
+
+{dateValue} {
+    char* seperator = 0;
+    if(strchr(yytext, '/') != NULL)
+    {
+        seperator = "/";
+    }
+    if(strchr(yytext, '-') != NULL)
+    {
+        seperator = "-";
+    }
+    if(strchr(yytext, '.') != NULL)
+    {
+        seperator = ".";
+    }
+    char * newYytext = strtok(yytext, seperator); //day
+    printf("%d_tDATE_(Day_%s_Month_",numberOfLines, newYytext);
+    newYytext = strtok(NULL, seperator); //month
+    printf("%s_Year_", newYytext);
+    newYytext = strtok(NULL, seperator);//year
+    printf("%s)\n", newYytext);
+    }
+
+{timeValue} {
+    char * newYytext = strtok(yytext, ":");
+    printf("%d_tTIME_(Hour_%s_Minute_",numberOfLines, newYytext);
+    newYytext = strtok(NULL, ":");
+    printf("%s)\n", newYytext);  
+    }
+[\t ] ;
+\n numberOfLines++;
+{illegalCharacter} printf("%d_ILLEGAL_CHARACTER_(%s)\n",numberOfLines, yytext);
+
+
+"//"    BEGIN(singleCommentState);
+<singleCommentState>"\n"    {
+    numberOfLines++;
+    BEGIN(INITIAL);
+    }
+<singleCommentState>. ;
+
+"/*"    {
+    numberOfNestedComments++;
+    BEGIN(multipleLineCommentState);
+}
+<multipleLineCommentState>"*/"   {
+    numberOfNestedComments--;
+    if(numberOfNestedComments==0){
+        BEGIN(INITIAL);
+    }
+    
+}
+<multipleLineCommentState>"/*" {   
+        numberOfNestedComments++;  
+}
+<multipleLineCommentState>\n {
+    numberOfLines++;
+}
+<multipleLineCommentState>. ;
+
+
+%%
+
+main(){
+    yylex();
+}
