@@ -1,0 +1,53 @@
+%{
+#include "your_username.tab.h" 
+int nested = 0;
+%}
+
+tNEWLINE \n
+
+tLOCALPART [A-Za-z0-9\-_]+(([A-Za-z0-9\-_]*|\.?)[A-Za-z0-9\-_])*
+tDOMAIN [A-Za-z0-9]+[A-Za-z0-9\-]*[A-Za-z0-9]+|[A-Za-z0-9]{1}
+
+/* Comments */
+tSLC  "//" 
+tOMLC "/\*" 
+tCMLC "*/"   
+
+
+%x singleLineComment multiLineComment
+%%
+
+{tSLC}  BEGIN(singleLineComment);
+<singleLineComment>{tNEWLINE}    {BEGIN(INITIAL);}
+<singleLineComment>.    ;
+
+{tOMLC} {BEGIN(multiLineComment); ++nested;}
+<multiLineComment>{tCMLC}      { if (--nested == 0) BEGIN(INITIAL); }
+<multiLineComment>{tOMLC}     ++nested;
+<multiLineComment>{tNEWLINE}    ;
+<multiLineComment>.         ;
+
+"Mail" return tMAIL;
+"end"[ \t\n\r\f]+"Mail" return tENDMAIL;
+"schedule" return tSCHEDULE;
+"end"[ \t\n\r\f]+"schedule" return tENDSCHEDULE;
+"send" return tSEND;
+"set" return tSET;
+"to" return tTO;
+"from" return tFROM;
+@ return tAT;
+, return tCOMMA;
+: return tCOLON;
+\( return tLPR;
+\) return tRPR;
+\[ return tLBR;
+\] return tRBR;
+[a-zA-Z\_]+[a-zA-Z0-9\_]* return tIDENT;
+["][^\"]*["] return tSTRING;
+[0-9]{2}"/"[0-9]{2}"/"[0-9]{4}|[0-9]{2}\.[0-9]{2}\.[0-9]{4}|[0-9]{2}-[0-9]{2}-[0-9]{4} return tDATE;
+[0-9]{2}:[0-9]{2} return tTIME;
+
+{tLOCALPART}"@"({tDOMAIN}"."{tDOMAIN}"."{tDOMAIN}|{tDOMAIN}"."{tDOMAIN}) return tADDRESS;
+. ;
+\n ;
+%%
